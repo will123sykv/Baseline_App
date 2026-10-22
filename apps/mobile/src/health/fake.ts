@@ -11,6 +11,9 @@ import type { DayHealth, HealthService, ProbeResult } from './types';
 
 const DAY_MS = 86_400_000;
 
+/** A weigh-in typed into the preview, kept for this session only. */
+let fakeWeightKg: number | null = null;
+
 /** Repeatable pseudo-random in [0, 1) from an integer seed. */
 function noise(seed: number): number {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
@@ -25,7 +28,10 @@ function dayFor(date: Date, daysAgo: number): DayHealth {
     date: localIsoDate(date),
     steps: Math.round(6500 + noise(seed + 1) * 6000),
     activeKcal: Math.round(380 + noise(seed + 2) * 320),
-    restingKcal: Math.round(1760 + noise(seed + 3) * 30),
+    // No strap means nothing writes resting energy, which is what `probe`
+    // below reports too. Calories out has to fall back to Mifflin–St Jeor,
+    // so the preview shows what the phone will really show.
+    restingKcal: null,
     hrvMs: Math.round((58 + noise(seed + 4) * 18 - roughPatch * 20) * 10) / 10,
     restingHr: Math.round(54 + noise(seed + 5) * 5 + roughPatch * 5),
     weightKg: noise(seed + 6) > 0.4 ? Math.round((75.5 - (30 - daysAgo) * 0.02 + noise(seed + 7) * 0.6) * 10) / 10 : null,
@@ -55,10 +61,23 @@ export const fakeHealthService: HealthService = {
       const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - daysAgo);
       const day = dayFor(d, daysAgo);
       // Today is still in progress.
-      if (daysAgo === 0) return { ...day, steps: Math.round((day.steps ?? 0) * 0.45), activeKcal: Math.round((day.activeKcal ?? 0) * 0.45) };
+      if (daysAgo === 0) {
+        return {
+          ...day,
+          steps: Math.round((day.steps ?? 0) * 0.45),
+          activeKcal: Math.round((day.activeKcal ?? 0) * 0.45),
+          weightKg: fakeWeightKg ?? day.weightKg,
+        };
+      }
       return day;
     });
   },
+  async saveWeight(kg: number) {
+    // Nothing to write to in the browser preview; remember it for this session
+    // so the Today screen reacts the way it would on the phone.
+    fakeWeightKg = kg;
+  },
+
   async probe(): Promise<ProbeResult[]> {
     const at = new Date();
     const zepp = (label: string, identifier: string, count: number, value: string): ProbeResult => ({

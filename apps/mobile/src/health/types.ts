@@ -16,6 +16,12 @@ export interface HealthService {
   getDays(count: number): Promise<DayHealth[]>;
   /** Step 0: which types arrive, from which app, and how recently. */
   probe(): Promise<ProbeResult[]>;
+  /**
+   * Write a weigh-in to Apple Health. Already covered by the permissions the
+   * app asks for, so this needs no new iOS build. Health then feeds it back
+   * through `getDays`, which is what drives the weight trend.
+   */
+  saveWeight(kg: number, at?: Date): Promise<void>;
 }
 
 export interface ProbeResult {

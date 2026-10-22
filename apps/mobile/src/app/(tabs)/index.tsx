@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { TodaySummary } from '@baseline/core';
+import { SymbolView } from 'expo-symbols';
+import { formatWeight, profileIsComplete, type TodaySummary, type UserSettings } from '@baseline/core';
 import { RecoveryDial } from '@/components/RecoveryDial';
 import { Button, Card, Dim, Row, Stat } from '@/components/ui';
+import { useSettings } from '@/hooks/useSettings';
 import { useToday } from '@/hooks/useToday';
 import { signingInfo } from '@/lib/build';
 import { colors, space, type } from '@/theme';
@@ -32,7 +34,32 @@ function SigningBanner() {
   );
 }
 
-function Cards({ s }: { s: TodaySummary }) {
+function SettingsButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={onPress} hitSlop={12}>
+      <SymbolView
+        name="person.crop.circle"
+        tintColor={colors.textDim}
+        size={26}
+        fallback={<Text style={{ color: colors.textDim, fontSize: 20 }}>☰</Text>}
+      />
+    </Pressable>
+  );
+}
+
+function Cards({
+  s,
+  settings,
+  latestWeightKg,
+  onSettings,
+  onLogWeight,
+}: {
+  s: TodaySummary;
+  settings: UserSettings;
+  latestWeightKg: number | null;
+  onSettings: () => void;
+  onLogWeight: () => void;
+}) {
   return (
     <>
       <Card title="Recovery" style={{ alignItems: 'center' }}>
@@ -59,7 +86,7 @@ function Cards({ s }: { s: TodaySummary }) {
           <Dim>Debt {s.sleep.debtHours} h (7 nights)</Dim>
         </Card>
         <Card title="Steps" style={{ flex: 1 }}>
-          <Stat value={n(s.steps.today)} color={colors.steps} sub={`7-day avg ${n(s.steps.avg7)}`} />
+          <Stat value={n(s.steps.today)} color={colors.steps} sub={`Target ${n(settings.targets.steps)}`} />
         </Card>
       </Row>
 
@@ -73,16 +100,27 @@ function Cards({ s }: { s: TodaySummary }) {
             </Dim>
           </>
         ) : (
-          <Dim>No resting energy in Apple Health yet. Calories in and out arrive in Phase 1.</Dim>
+          <>
+            <Dim>
+              Apple Health has no resting energy, and your profile isn't finished, so there's nothing to add the active calories to.
+            </Dim>
+            <Button label="Finish your profile" kind="secondary" onPress={onSettings} />
+          </>
         )}
       </Card>
 
       <Card title="Weight trend">
         <Stat
-          value={s.weight.trendKg === null ? '–' : s.weight.trendKg.toFixed(1)}
-          unit="kg"
-          sub={s.weight.weeklyRateKg === null ? 'Log weight in Apple Health to start a trend' : `${s.weight.weeklyRateKg > 0 ? '+' : ''}${s.weight.weeklyRateKg.toFixed(2)} kg this week`}
+          value={s.weight.trendKg === null ? '–' : formatWeight(s.weight.trendKg, settings.units)}
+          sub={
+            s.weight.weeklyRateKg === null
+              ? latestWeightKg === null
+                ? 'Log a weigh-in to start a trend'
+                : 'A few more days and a weekly rate appears'
+              : `${s.weight.weeklyRateKg > 0 ? '+' : ''}${s.weight.weeklyRateKg.toFixed(2)} kg this week`
+          }
         />
+        <Button label="Log weight" kind="secondary" onPress={onLogWeight} />
       </Card>
     </>
   );
@@ -90,7 +128,10 @@ function Cards({ s }: { s: TodaySummary }) {
 
 export default function Today() {
   const router = useRouter();
+  const { settings } = useSettings();
   const { state, refresh, refreshing } = useToday();
+
+  const onSettings = () => router.push('/settings');
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -98,12 +139,23 @@ export default function Today() {
         contentContainerStyle={{ padding: space.lg, gap: space.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.textDim} />}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={[type.title, { color: colors.text }]}>Today</Text>
-          {state.kind === 'ready' && state.source === 'fake' && <Dim>Sample data</Dim>}
+          <Row style={{ alignItems: 'center' }}>
+            {state.kind === 'ready' && state.source === 'fake' && <Dim>Sample data</Dim>}
+            <SettingsButton onPress={onSettings} />
+          </Row>
         </View>
 
         <SigningBanner />
+
+        {!profileIsComplete(settings) && state.kind === 'ready' && (
+          <Card style={{ borderColor: colors.warn }}>
+            <Text style={[type.label, { color: colors.warn }]}>FINISH YOUR PROFILE</Text>
+            <Dim>Add your sex, height and birth year so Baseline can work out resting energy and your calorie targets.</Dim>
+            <Button label="Open Settings" kind="secondary" onPress={onSettings} />
+          </Card>
+        )}
 
         {state.kind === 'loading' && <Dim>Reading Apple Health…</Dim>}
         {state.kind === 'unavailable' && (
@@ -117,7 +169,15 @@ export default function Today() {
             <Button label="Try again" kind="secondary" onPress={refresh} />
           </Card>
         )}
-        {state.kind === 'ready' && <Cards s={state.summary} />}
+        {state.kind === 'ready' && (
+          <Cards
+            s={state.summary}
+            settings={settings}
+            latestWeightKg={state.latestWeightKg}
+            onSettings={onSettings}
+            onLogWeight={() => router.push('/log-weight')}
+          />
+        )}
 
         <Button label="Open Step 0 check" kind="secondary" onPress={() => router.push('/step0')} />
       </ScrollView>

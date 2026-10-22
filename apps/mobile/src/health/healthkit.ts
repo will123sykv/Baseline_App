@@ -5,6 +5,7 @@ import {
   queryStatisticsCollectionForQuantity,
   queryWorkoutSamples,
   requestAuthorization,
+  saveQuantitySample,
   type QuantityTypeIdentifier,
 } from '@kingstinct/react-native-healthkit';
 import { localIsoDate, type Night } from '@baseline/core';
@@ -200,6 +201,11 @@ export const healthKitService: HealthService = {
       });
     }
     return days;
+  },
+
+  async saveWeight(kg, at = new Date()) {
+    // A weigh-in is a single point in time, so start and end are the same.
+    await saveQuantitySample('HKQuantityTypeIdentifierBodyMass', 'kg', kg, at, at);
   },
 
   async probe() {

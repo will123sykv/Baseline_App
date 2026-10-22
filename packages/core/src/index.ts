@@ -10,6 +10,7 @@ export * from './strain';
 export * from './energy';
 export * from './illness';
 export * from './nutrition';
+export * from './profile';
 export * from './strength';
 export * from './daily';
 export * from './summary';
