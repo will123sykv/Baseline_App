@@ -17,6 +17,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: 'Settings', presentation: 'modal' }} />
         <Stack.Screen name="log-weight" options={{ title: 'Log weight', presentation: 'modal' }} />
+        <Stack.Screen name="food-add" options={{ title: 'Add food', presentation: 'modal' }} />
         <Stack.Screen name="step0" options={{ title: 'Step 0 check', presentation: 'modal' }} />
       </Stack>
     </>

@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { bodyProfile, summarizeToday, type DayHealth, type SummaryOptions, type TodaySummary } from '@baseline/core';
 import { getHealth } from '@/health';
-import { useSettings } from './useSettings';
+import { rememberWeight, useSettings } from './useSettings';
 
 /** 30 days of baseline plus today. */
 const DAYS = 31;
@@ -39,6 +39,9 @@ export function useToday() {
       const days = await health.getDays(DAYS);
 
       const weightKg = latestWeight(days);
+      // Kept so the Food screen can set a protein target without reading
+      // Apple Health all over again.
+      rememberWeight(weightKg);
       const profile = bodyProfile(settings, weightKg);
       // Built up field by field so an absent profile stays absent rather than
       // being passed as undefined.

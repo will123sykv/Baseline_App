@@ -115,6 +115,17 @@ export function formatWeight(kg: Maybe<number>, units: Units): string {
   return `${stone} st ${lb.toFixed(1)} lb`;
 }
 
+/**
+ * A weekly rate of change: "+0.14 kg" or "-0.3 lb". Stone makes no sense for
+ * a change this small, so imperial uses pounds on their own.
+ */
+export function formatWeightChange(kg: Maybe<number>, units: Units): string {
+  if (!isNum(kg)) return '–';
+  const value = units === 'metric' ? round(kg, 2) : round(kg * LB_PER_KG, 1);
+  const unit = units === 'metric' ? 'kg' : 'lb';
+  return `${value > 0 ? '+' : ''}${value.toFixed(units === 'metric' ? 2 : 1)} ${unit}`;
+}
+
 /** "178 cm" or "5 ft 10 in". */
 export function formatHeight(cm: Maybe<number>, units: Units): string {
   if (!isNum(cm)) return '–';

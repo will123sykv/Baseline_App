@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
-import { formatWeight, profileIsComplete, type TodaySummary, type UserSettings } from '@baseline/core';
+import { formatWeight, formatWeightChange, profileIsComplete, type TodaySummary, type UserSettings } from '@baseline/core';
 import { RecoveryDial } from '@/components/RecoveryDial';
 import { Button, Card, Dim, Row, Stat } from '@/components/ui';
 import { useSettings } from '@/hooks/useSettings';
@@ -117,7 +117,7 @@ function Cards({
               ? latestWeightKg === null
                 ? 'Log a weigh-in to start a trend'
                 : 'A few more days and a weekly rate appears'
-              : `${s.weight.weeklyRateKg > 0 ? '+' : ''}${s.weight.weeklyRateKg.toFixed(2)} kg this week`
+              : `${formatWeightChange(s.weight.weeklyRateKg, settings.units)} this week`
           }
         />
         <Button label="Log weight" kind="secondary" onPress={onLogWeight} />

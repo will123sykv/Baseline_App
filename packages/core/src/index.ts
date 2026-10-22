@@ -11,6 +11,7 @@ export * from './energy';
 export * from './illness';
 export * from './nutrition';
 export * from './profile';
+export * from './food';
 export * from './strength';
 export * from './daily';
 export * from './summary';

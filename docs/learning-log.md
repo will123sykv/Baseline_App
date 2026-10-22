@@ -2,6 +2,37 @@
 
 Newest first. A few lines per piece of work: what changed, and one idea worth understanding.
 
+## 2026-10-22 · Food tab: quick add, saved foods, copy yesterday
+
+**What changed:** The Food tab is a real screen. Calories remaining with
+protein, carb and fat bars; meals grouped into breakfast, lunch, dinner and
+snacks; quick add; saving a food to reuse; one-tap repeat portions; and copy
+yesterday. `packages/core/src/food.ts` holds the maths, with 12 tests — the
+suite is now 85.
+
+Open Food Facts search and barcode scanning are still to come, so there is no
+credit line on the screen yet; it goes on when their data first appears.
+
+**Worth understanding:**
+
+- **The screen never does arithmetic.** `food.tsx` renders what
+  `macroProgress()` returns. That's why "what's left" could be tested without
+  a phone, a browser or a screen at all — and why the web dashboard will later
+  show the same numbers without the logic being written twice.
+- **A bug worth recognising again.** Tapping a saved food opened a screen with
+  the Add button permanently greyed out. The saved foods arrive from the save
+  file a moment *after* the screen first draws, and `useState` only takes its
+  starting value on that first draw — so the name stayed empty, and the button
+  checked for a name. Same shape as the Settings screen needing a `useEffect`.
+  Any time a screen seems to ignore saved data, ask whether it read it before
+  it had arrived.
+- **Pick the control the app can already draw.** Swipe-to-delete needs
+  `react-native-gesture-handler`, a native library — so it would mean a new
+  iOS build and a reinstall. A plain × does the same job over the air.
+- **Mixed units are a real trap.** The weight card briefly showed the trend in
+  stone and the weekly rate in kg. Stone is also silly for a change of 0.14 kg,
+  so the rate shows pounds on its own.
+
 ## 2026-10-22 · Settings, profile and weigh-ins
 
 **What changed:** Added a Settings screen (sex, height, birth year, units,

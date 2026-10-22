@@ -7,6 +7,7 @@ import {
   cmToFtIn,
   formatHeight,
   formatWeight,
+  formatWeightChange,
   ftInToCm,
   kgToStoneLb,
   profileIsComplete,
@@ -89,6 +90,13 @@ describe('units', () => {
     expect(formatWeight(75, 'imperial')).toBe('11 st 11.3 lb');
     expect(formatHeight(178, 'metric')).toBe('178 cm');
     expect(formatHeight(178, 'imperial')).toBe('5 ft 10 in');
+  });
+
+  it('formats a weekly change in pounds, not stone', () => {
+    expect(formatWeightChange(-0.14, 'metric')).toBe('-0.14 kg');
+    expect(formatWeightChange(0.14, 'metric')).toBe('+0.14 kg');
+    expect(formatWeightChange(-0.14, 'imperial')).toBe('-0.3 lb');
+    expect(formatWeightChange(null, 'metric')).toBe('–');
   });
 
   it('shows a dash when there is nothing to show', () => {
