@@ -1,0 +1,112 @@
+# Builds an UNSIGNED iPhone app (.ipa) on a free GitHub macOS runner.
+# Sideloadly on your Windows PC then signs it with your free Apple ID and installs it.
+#
+# Run it from GitHub → Actions → "iOS build (unsigned)" → Run workflow.
+# Only needed when native code changes (new library, Health type, widget, app.json plugin).
+# Everyday JavaScript changes go out with the "OTA update" workflow instead.
+name: iOS build (unsigned)
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "release = real app with over-the-air updates; development = loads code live from your PC"
+        type: choice
+        options: [release, development]
+        default: release
+
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      CONFIGURATION: ${{ inputs.variant == 'development' && 'Debug' || 'Release' }}
+      APP_NAME: Baseline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run core tests
+        run: npm test
+
+      - name: Record the native fingerprint (before prebuild, to match OTA updates)
+        id: fingerprint
+        working-directory: apps/mobile
+        run: |
+          FP=$(npx expo-updates fingerprint:generate --platform ios | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).hash))')
+          echo "hash=$FP" >> "$GITHUB_OUTPUT"
+          echo "Native fingerprint (runtime version): \`$FP\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate the iOS project (prebuild + CocoaPods)
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build without signing
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace "$APP_NAME.xcworkspace" \
+            -scheme "$APP_NAME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*deprecated|\*\* ARCHIVE" || true
+          test -d "$RUNNER_TEMP/$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" || { tail -200 "$RUNNER_TEMP/xcodebuild.log"; exit 1; }
+
+      # Unsigned builds carry no entitlements. Ad-hoc signing with the generated
+      # entitlements file embeds them, so Sideloadly can see the app needs HealthKit
+      # and asks Apple for a profile that includes it.
+      - name: Embed entitlements (ad-hoc signature)
+        run: |
+          APP="$RUNNER_TEMP/$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app"
+          ENT="apps/mobile/ios/$APP_NAME/$APP_NAME.entitlements"
+          echo "Entitlements:"; cat "$ENT"
+          # Nested frameworks and extensions first (no entitlements), then the app itself.
+          for dir in "$APP/Frameworks" "$APP/PlugIns"; do
+            [ -d "$dir" ] || continue
+            find "$dir" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" -o -name "*.appex" \) -print0 |
+              xargs -0 -I{} codesign --force --sign - --timestamp=none "{}"
+          done
+          codesign --force --sign - --entitlements "$ENT" --timestamp=none "$APP"
+          codesign -d --entitlements - "$APP"
+
+      - name: Package .ipa
+        id: package
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          IPA="$APP_NAME-${{ inputs.variant }}-$SHORT_SHA-unsigned.ipa"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$RUNNER_TEMP/$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/$IPA" Payload)
+          echo "ipa=$IPA" >> "$GITHUB_OUTPUT"
+          ls -lh "$IPA"
+          {
+            echo "### $IPA"
+            echo "Download it from the Artifacts section below, unzip it, and drag the .ipa into Sideloadly."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.ipa }}
+          path: ${{ steps.package.outputs.ipa }}
+          retention-days: 14
+          if-no-files-found: error

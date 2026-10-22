@@ -1,0 +1,79 @@
+# Publishes the app's JavaScript to Expo (EAS Update). The app downloads it on
+# its next launch and applies it on the one after. No reinstall needed.
+#
+# Runs on every push to main that touches the app or the maths, and can be run
+# by hand. Needs the EXPO_TOKEN repository secret (see docs/SETUP.md).
+#
+# Only builds with the same native fingerprint receive an update, so an update
+# that needs new native code can never crash an older build; it just waits for
+# the next "iOS build (unsigned)".
+name: OTA update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "packages/core/**"
+      - "package-lock.json"
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Update message"
+        required: false
+
+concurrency:
+  group: ota-update
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check the Expo token is set
+        id: token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN secret not set yet, skipping. See docs/SETUP.md step 5." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and test
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          npm ci
+          npm test
+          npm run typecheck
+
+      - name: Publish update
+        if: steps.token.outputs.ok == 'true'
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          MESSAGE: ${{ inputs.message || github.event.head_commit.message }}
+        run: |
+          npx eas-cli@latest update \
+            --channel production \
+            --environment production \
+            --platform ios \
+            --message "${MESSAGE:-manual update}" \
+            --non-interactive
+          FP=$(npx expo-updates fingerprint:generate --platform ios | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).hash))')
+          {
+            echo "Published for native fingerprint \`$FP\`."
+            echo "If this doesn't match the fingerprint of the build on your phone (Step 0 screen → runtime), run \"iOS build (unsigned)\"."
+          } >> "$GITHUB_STEP_SUMMARY"

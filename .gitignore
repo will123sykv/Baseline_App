@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.ipa
+*.xcarchive
+coverage/
+.env
+.env*.local

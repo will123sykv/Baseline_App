@@ -1,0 +1,14 @@
+{
+  "name": "baseline",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspace @baseline/core",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "mobile": "npm run start --workspace mobile",
+    "web": "npm run web --workspace mobile"
+  }
+}
