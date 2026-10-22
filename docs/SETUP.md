@@ -12,7 +12,7 @@ You need: your Windows PC, your iPhone and a USB cable, a GitHub account, your A
    cd Baseline_App
    npm install
    ```
-2. Check the maths: `npm test` should say **60 passed**.
+2. Check the maths: `npm test` should end with **all tests passed** — 60 on the first commit, more as features land.
 3. Look at the app in your browser with sample data: `npm run web`, then press `w` if a browser doesn't open. This is the quickest way to see screen changes while you work.
 
 ## 2 · Expo account (free) for over-the-air updates
